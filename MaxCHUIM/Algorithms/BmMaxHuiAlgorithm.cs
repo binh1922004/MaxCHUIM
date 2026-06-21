@@ -8,13 +8,7 @@ using MaxCHUIM.Utilities;
 
 namespace MaxCHUIM.Algorithms;
 
-public enum AlgorithmMode
-{
-    CHUI,
-    MaxCHUI
-}
-
-public class MaxCHuimAlgorithm : BaseAlgorithm
+public class BmMaxHuiAlgorithm : BaseAlgorithm
 {
     private long _mu;
     private AlgorithmMode _mode;
@@ -23,8 +17,8 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
     private int _newms;
     private long _candidatesCount;
 
-    private readonly ChuiStore _chuiStore = new();
-    private readonly MaxHuiStore _maxHuiStore = new();
+    private BmChuiStore _chuiStore = null!;
+    private BmMaxHuiStore _maxHuiStore = null!;
 
     public AlgorithmResult Run(QuantitativeDatabase db, long mu, AlgorithmMode mode)
     {
@@ -32,12 +26,23 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         _mu = mu;
         _mode = mode;
         _candidatesCount = 0;
-        _chuiStore.Clear();
-        _maxHuiStore.Clear();
 
         // 2. Preprocess database
         var rd = DatasetPreprocessor.Preprocess(db, mu);
         _newms = rd.Newms;
+
+        // Ordered list of frequent items (by ascending TWU, matching TPUT structure)
+        var frequentItems = rd.TwuMap.Keys.ToList();
+        frequentItems.Sort((a, b) =>
+        {
+            var twuA = rd.TwuMap[a];
+            var twuB = rd.TwuMap[b];
+            return twuA != twuB ? twuA.CompareTo(twuB) : a.CompareTo(b);
+        });
+
+        // Initialize stores
+        _chuiStore = new BmChuiStore();
+        _maxHuiStore = new BmMaxHuiStore(frequentItems);
 
         // Build O(1) transaction lookup
         var maxTid = 0;
@@ -45,10 +50,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         for (var i = 0; i < txCount; i++)
         {
             var tid = rd.Transactions[i].Tid;
-            if (tid > maxTid)
-            {
-                maxTid = tid;
-            }
+            if (tid > maxTid) maxTid = tid;
         }
         _txById = new Transaction[maxTid + 1];
         for (var i = 0; i < txCount; i++)
@@ -61,29 +63,22 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         _tput = new Tput();
         _tput.Build(rd);
 
-        // Ordered list of frequent items (by ascending TWU, matching TPUT structure)
-        var frequentItems = rd.TwuMap.Keys.ToList();
-        frequentItems.Sort((a, b) =>
-        {
-            var twuA = rd.TwuMap[a];
-            var twuB = rd.TwuMap[b];
-            return twuA != twuB ? twuA.CompareTo(twuB) : a.CompareTo(b); // Stable tie-break
-        });
-
-        // 4. Outer loop over items aj (ordered by ≺twu)
+        // 4. Outer loop over items aj
         var itemCount = frequentItems.Count;
         for (var j = 0; j < itemCount; j++)
         {
             var aj = frequentItems[j];
+            var itemsetA = new Itemset([aj]);
 
             // Build 1-itemset MPUN-list
             var mlJ = MpunList.BuildOneItemset(_tput, aj, _txById);
+            long twuA = mlJ.ComputeTwu(_tput, _txById);
 
             // SPWUB check
             if (mlJ.Fwub() < _mu)
             {
-                // Update if HUI
-                Update(new Itemset(new[] { aj }), mlJ.Utility(), mlJ.ComputeTwu(_tput, _txById), mlJ.Support());
+                // Is closed check isn't fully possible here (no extensions), just try to update
+                UpdateBmMaxCHUI(itemsetA, mlJ.Utility(), twuA, mlJ.Support(), true);
                 continue;
             }
 
@@ -95,7 +90,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
 
             _candidatesCount++;
 
-            // Build 2-itemsets MPUN-lists {aj⊕ak | k ≻twu j}
+            // Build 2-itemsets MPUN-lists
             var mls = new List<MpunList>();
             for (int k = j + 1; k < itemCount; k++)
             {
@@ -104,13 +99,13 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
                 mls.Add(mlJK);
             }
 
-            var cnt = mls.Count(ml => ml.Support() == mlJ.Support());
-            UpdateMaxCHUI(new Itemset([aj]), mls, cnt, mlJ.Utility(), mlJ.ComputeTwu(_tput, _txById), mlJ.Support());
-            
-            if (cnt < mls.Count)
-            {
-                FindMaxCHUI(mls, [aj]);
-            }
+            bool hasForward = mls.Any(ml => ml.Support() == mlJ.Support());
+            bool backward = _chuiStore.CheckBackward(itemsetA, mlJ.Support(), twuA);
+            bool isClosed = !hasForward && !backward;
+
+            UpdateBmMaxCHUI(itemsetA, mlJ.Utility(), twuA, mlJ.Support(), isClosed);
+
+            FindBmMaxCHUI(mls, [aj]);
         }
 
         watch.Stop();
@@ -126,7 +121,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         return result;
     }
 
-    private void FindMaxCHUI(List<MpunList> mls, List<int> prefix)
+    private void FindBmMaxCHUI(List<MpunList> mls, List<int> prefix)
     {
         int mlsCount = mls.Count;
         for (int j = 0; j < mlsCount; j++)
@@ -134,43 +129,31 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
             var mlJ = mls[j];
             int itemJ = mlJ.Item;
 
-            // 1. A = prefix ⊕ MLj.item
             var AList = new List<int>(prefix.Count + 1);
             AList.AddRange(prefix);
             AList.Add(itemJ);
             var A = new Itemset(AList);
 
-            // Compute TWU of A
             long twuA = mlJ.ComputeTwu(_tput, _txById);
 
-            // 2. If fwub(A) < mu -> Update(A) then return
             if (mlJ.Fwub() < _mu)
             {
-                Update(A, mlJ.Utility(), twuA, mlJ.Support());
+                UpdateBmMaxCHUI(A, mlJ.Utility(), twuA, mlJ.Support(), true);
                 continue;
             }
 
-            // 3. If supp(A) < newms -> skip
             if (mlJ.Support() < _newms)
             {
                 continue;
             }
 
-            // 4. If MLj.PruningNonMCBr == true -> skip (LPSNonCHUB)
             if (mlJ.PruningNonMCBr)
-            {
-                continue;
-            }
-
-            // 5. If CheckBackward(A) == true -> skip (PSNonCHUB)
-            if (_chuiStore.CheckBackward(A, mlJ.Support(), twuA))
             {
                 continue;
             }
 
             _candidatesCount++;
 
-            // 6. Build extension MPUN-lists MLjk for each later MLk
             var extensionLists = new List<MpunList>();
             for (int k = j + 1; k < mlsCount; k++)
             {
@@ -195,10 +178,13 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
                 }
             }
 
-            // 7. UpdateMaxCHUI
-            Update(A, mlJ.Utility(), twuA, mlJ.Support());
+            bool hasForward = extensionLists.Any(ml => ml.Support() == mlJ.Support());
+            bool backward = _chuiStore.CheckBackward(A, mlJ.Support(), twuA);
+            bool isClosed = !hasForward && !backward;
 
-            // 8. Recurse into surviving extensions
+            UpdateBmMaxCHUI(A, mlJ.Utility(), twuA, mlJ.Support(), isClosed);
+
+            // Important: Recurse into surviving extensions regardless of isClosed
             var survivingExtensions = new List<MpunList>();
             for (int k = 0; k < extCount; k++)
             {
@@ -213,40 +199,29 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
                     extItemList.AddRange(AList);
                     extItemList.Add(mlJK.Item);
                     var extItemset = new Itemset(extItemList);
-                    Update(extItemset, mlJK.Utility(), mlJK.ComputeTwu(_tput, _txById), mlJK.Support());
+                    UpdateBmMaxCHUI(extItemset, mlJK.Utility(), mlJK.ComputeTwu(_tput, _txById), mlJK.Support(), true);
                 }
             }
 
             if (survivingExtensions.Count > 0)
             {
-                FindMaxCHUI(survivingExtensions, AList);
+                FindBmMaxCHUI(survivingExtensions, AList);
             }
         }
     }
 
-    private void UpdateMaxCHUI(Itemset A, List<MpunList> mls, int cnt, long utilityA, long twuA, int supportA)
-    {
-        if (cnt == 0)
-        {
-            Update(A, utilityA, twuA, supportA);
-        }
-        else if (cnt == mls.Count)
-        {
-            var listB = new List<int>() { A.Items[0] };
-            var utilityB = mls.Sum(mpunList => mpunList.Utility()) + utilityA;
-            listB.AddRange(mls.Select(mpunList => mpunList.Item));
-            var itemsetB = new Itemset(listB);
-            Update(itemsetB, utilityB, twuA, supportA);
-        }
-    }
-    private void Update(Itemset A, long utility, long twu, int support)
+    private void UpdateBmMaxCHUI(Itemset A, long utility, long twu, int support, bool isClosed)
     {
         if (utility >= _mu)
         {
-            _chuiStore.Add(A, support, utility, twu);
+            if (isClosed)
+            {
+                _chuiStore.Add(A, support, utility, twu);
+            }
+
             if (_mode == AlgorithmMode.MaxCHUI)
             {
-                _maxHuiStore.UpdateMHUI(A, utility, twu);
+                _maxHuiStore.UpdateMHUI(A, utility);
             }
         }
     }

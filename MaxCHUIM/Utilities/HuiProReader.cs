@@ -93,10 +93,9 @@ public static class HuiProReader
                 QItems = items,
                 TU = tu
             });
-            Console.WriteLine($"Read transaction Tid={tid} with {items.Count} items and TU={tu}");
         }
         
-        
+        Console.WriteLine("Finished reading .hui and .pro files. Total transactions: " + database.Transactions.Count);
         return database;
     }
 }

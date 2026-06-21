@@ -30,7 +30,6 @@ public static class DatasetPreprocessor
 
         // 2. Remove items where TWU(aj) < mu.
         var frequentItems = twuMap.Where(kvp => kvp.Value >= mu).Select(kvp => kvp.Key).ToHashSet();
-
         // 3. Remove empty transactions, filter items, and sort items inside each transaction by ascending TWU.
         var reducedTransactions = new List<Transaction>();
 
@@ -97,10 +96,6 @@ public static class DatasetPreprocessor
         // Keep only frequent items in the twuMap
         var reducedTwuMap = twuMap.Where(kvp => frequentItems.Contains(kvp.Key)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         var rd =  new ReducedDatabase(reducedTransactions, reducedTwuMap, maxTwu, newms);
-        foreach (var item in reducedTransactions)
-        {
-            Console.WriteLine($"Tid: {item.Tid}, TU: {item.TU}, QItems: [{string.Join(", ", item.QItems.Select(q => $"(Item: {q.Item}, Util: {q.Utility})"))}]");
-        }
 
         return rd;
         // Define item comparison helper
