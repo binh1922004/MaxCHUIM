@@ -43,13 +43,25 @@ class Program
 
         var tput = new Tput();
         tput.Build(rd);
+        
+        Console.WriteLine("========================================");
         var res1 = RunAlgorithm("MaxCHuim", db, mu, AlgorithmMode.MaxCHUI);
+        
+        Console.WriteLine("========================================");
         var res2 = RunAlgorithm("BmMaxHui", db, mu, AlgorithmMode.MaxCHUI);
+        
+        Console.WriteLine("========================================");
+        var res3 = RunAlgorithm("BruteForce", db, mu, AlgorithmMode.MaxCHUI);
         
         VerifyAndSortResults(db, res1);
         VerifyAndSortResults(db, res2);
+        VerifyAndSortResults(db, res3);
 
-        CompareMaxHUIs(res1.MaxHUIs, res2.MaxHUIs);
+        Console.WriteLine("\n[1] Compare BmMaxHui against Ground Truth (BruteForce):");
+        CompareMaxHUIs(res3.MaxHUIs, res2.MaxHUIs); // list1=BruteForce, list2=BmMaxHui
+        
+        Console.WriteLine("\n[2] Compare MaxCHuim against Ground Truth (BruteForce):");
+        CompareMaxHUIs(res3.MaxHUIs, res1.MaxHUIs); // list1=BruteForce, list2=MaxCHuim
     }
 
     static void VerifyAndSortResults(QuantitativeDatabase db, AlgorithmResult res)
@@ -165,6 +177,10 @@ class Program
         {
             algo = new BmMaxHuiAlgorithm();
         }
+        else if (algorithm == "BruteForce")
+        {
+            algo = new BruteForceAlgorithm();
+        }
         
         Console.WriteLine($"Algorithm: {algorithm}, Mode: {mode}, mu: {mu}");
 
@@ -186,6 +202,7 @@ class Program
         Console.WriteLine($"\nRuntime: {result.Runtime.TotalMilliseconds} ms");
         Console.WriteLine($"ClosedHUIs Found: {result.CHUIs.Count} - MaxHUIs Found: {result.MaxHUIs.Count}");
         Console.WriteLine($"Candidate Itemsets Evaluated: {result.CandidatesCount}");
+        Console.WriteLine($"MaxHui Checks Performed: {result.MaxHuiChecksCount}");
         
         ValidateMaxHUIs(result.MaxHUIs);
 

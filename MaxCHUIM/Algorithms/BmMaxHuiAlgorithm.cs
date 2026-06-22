@@ -16,6 +16,7 @@ public class BmMaxHuiAlgorithm : BaseAlgorithm
     private Transaction[] _txById = null!;
     private int _newms;
     private long _candidatesCount;
+    private long _maxHuiChecksCount;
 
     private BmChuiStore _chuiStore = null!;
     private BmMaxHuiStore _maxHuiStore = null!;
@@ -26,6 +27,8 @@ public class BmMaxHuiAlgorithm : BaseAlgorithm
         _mu = mu;
         _mode = mode;
         _candidatesCount = 0;
+        _maxHuiChecksCount = 0;
+        _chuiStore = new BmChuiStore();
 
         // 2. Preprocess database
         var rd = DatasetPreprocessor.Preprocess(db, mu);
@@ -115,7 +118,8 @@ public class BmMaxHuiAlgorithm : BaseAlgorithm
             CHUIs = _chuiStore.GetAllEntries(),
             MaxHUIs = _mode == AlgorithmMode.MaxCHUI ? _maxHuiStore.GetAllEntries() : new List<MaxHuiEntry>(),
             Runtime = watch.Elapsed,
-            CandidatesCount = _candidatesCount
+            CandidatesCount = _candidatesCount,
+            MaxHuiChecksCount = _maxHuiChecksCount
         };
 
         return result;
@@ -221,6 +225,7 @@ public class BmMaxHuiAlgorithm : BaseAlgorithm
 
             if (_mode == AlgorithmMode.MaxCHUI)
             {
+                _maxHuiChecksCount++;
                 _maxHuiStore.UpdateMHUI(A, utility);
             }
         }

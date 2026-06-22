@@ -22,6 +22,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
     private Transaction[] _txById = null!;
     private int _newms;
     private long _candidatesCount;
+    private long _maxHuiChecksCount;
 
     private readonly ChuiStore _chuiStore = new();
     private readonly MaxHuiStore _maxHuiStore = new();
@@ -32,6 +33,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         _mu = mu;
         _mode = mode;
         _candidatesCount = 0;
+        _maxHuiChecksCount = 0;
         _chuiStore.Clear();
         _maxHuiStore.Clear();
 
@@ -120,7 +122,8 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
             CHUIs = _chuiStore.GetAllEntries(),
             MaxHUIs = _mode == AlgorithmMode.MaxCHUI ? _maxHuiStore.GetAllEntries() : new List<MaxHuiEntry>(),
             Runtime = watch.Elapsed,
-            CandidatesCount = _candidatesCount
+            CandidatesCount = _candidatesCount,
+            MaxHuiChecksCount = _maxHuiChecksCount
         };
 
         return result;
@@ -246,6 +249,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
             _chuiStore.Add(A, support, utility, twu);
             if (_mode == AlgorithmMode.MaxCHUI)
             {
+                _maxHuiChecksCount++;
                 _maxHuiStore.UpdateMHUI(A, utility, twu);
             }
         }

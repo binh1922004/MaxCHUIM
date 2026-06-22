@@ -9,4 +9,5 @@ public class AlgorithmResult
     public List<MaxHuiEntry> MaxHUIs { get; set; } = new();
     public TimeSpan Runtime { get; set; }
     public long CandidatesCount { get; set; }
+    public long MaxHuiChecksCount { get; set; }
 }
