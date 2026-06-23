@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using MaxCHUIM.Algorithms;
 using MaxCHUIM.DataStructures;
@@ -11,67 +12,121 @@ class Program
 {
     static void Main(string[] args)
     {
-        const string huiFile = "/Users/mac/BINH/NCKH/Dataset/HUI/mushroom.hui";
-        const string proFile = "/Users/mac/BINH/NCKH/Dataset/PRO/mushroom.pro";
+        // ─── Benchmark CLI mode ───
+        if (args.Contains("--benchmark"))
+        {
+            RunBenchmarkMode(args);
+            return;
+        }
 
+        // ─── Original interactive mode ───
+        const string huiFile = "/Users/mac/BINH/NCKH/Dataset/HUI/chess.hui";
+        const string proFile = "/Users/mac/BINH/NCKH/Dataset/PRO/chess.pro";
 
-        // Load database using the new HuiProReader
         var db = HuiProReader.Read(huiFile, proFile);
 
-        var threshHold = 0.9 * db.Transactions.Count;
-        var mu = (long)threshHold;
-        // Preprocess database manually to build and verify MPUN lists
+        double threshold = 0.2;
+        long totalTwu = db.Transactions.Sum(tx => tx.TU);
+        var mu = (long)(threshold * totalTwu);
         var rd = DatasetPreprocessor.Preprocess(db, mu);
-        
-        // Build O(1) transaction lookup
-        var maxTid = 0;
-        var txCount = rd.Transactions.Count;
-        for (var i = 0; i < txCount; i++)
-        {
-            var tid = rd.Transactions[i].Tid;
-            if (tid > maxTid)
-            {
-                maxTid = tid;
-            }
-        }
-        var txById = new Transaction[maxTid + 1];
-        for (var i = 0; i < txCount; i++)
-        {
-            var tx = rd.Transactions[i];
-            txById[tx.Tid] = tx;
-        }
 
-        var tput = new Tput();
-        var bruteForceAlg = new BruteForceAlgorithm();
         var maxCHuimBitmaxAlg = new MaxCHuimBitmaxAlgorithm();
         var maxCHuimAlg = new MaxCHuimAlgorithm();
-        var bmMaxHuiAlg = new BmMaxHuiAlgorithm();
 
         Console.WriteLine("========================================");
         var res1 = RunAlgorithm("MaxCHuim", maxCHuimAlg, db, mu, AlgorithmMode.MaxCHUI);
-        
-        // Console.WriteLine("========================================");
-        // var res2 = RunAlgorithm("BmMaxHui", bmMaxHuiAlg, db, mu, AlgorithmMode.MaxCHUI);
-        //
+
         Console.WriteLine("========================================");
         var resBitmaxOrig = RunAlgorithm("MaxCHuimBitmax", maxCHuimBitmaxAlg, db, mu, AlgorithmMode.MaxCHUI);
-        //
-        // Console.WriteLine("========================================");
-        // var resBruteForce = RunAlgorithm("BruteForce", bruteForceAlg, db, mu, AlgorithmMode.MaxCHUI);
-        //
-        // VerifyAndSortResults(db, res1);
-        // VerifyAndSortResults(db, res2);
-        // VerifyAndSortResults(db, resBitmaxOrig);
-        // VerifyAndSortResults(db, resBruteForce);
-        //
-        // Console.WriteLine("\n[1] Compare BmMaxHui against MaxCHuim:");
-        // CompareMaxHUIs(res1.MaxHUIs, res2.MaxHUIs);
-        //
-        // Console.WriteLine("\n[2] Compare MaxCHuimBitmax against MaxCHuim:");
-        // CompareMaxHUIs(res1.MaxHUIs, resBitmaxOrig.MaxHUIs);
-        //
-        // Console.WriteLine("\n[3] Compare MaxCHuimBitmax against BmMaxHui:");
-        // CompareMaxHUIs(res2.MaxHUIs, resBitmaxOrig.MaxHUIs);
+    }
+
+    // ─── Benchmark mode: single algorithm, structured output ───
+    static void RunBenchmarkMode(string[] args)
+    {
+        string algorithmName = GetArg(args, "--algorithm");
+        string huiPath = GetArg(args, "--hui");
+        string proPath = GetArg(args, "--pro");
+        double threshold = double.Parse(GetArg(args, "--threshold"));
+
+        // Resolve algorithm
+        BaseAlgorithm algo = algorithmName switch
+        {
+            "MaxCHuim" => new MaxCHuimAlgorithm(),
+            "MaxCHuimBitmax" => new MaxCHuimBitmaxAlgorithm(),
+            _ => throw new ArgumentException($"Unknown algorithm: {algorithmName}. Supported: MaxCHuim, MaxCHuimBitmax")
+        };
+
+        // Extract dataset name from file path (e.g., "/path/to/chess.hui" → "chess")
+        string datasetName = System.IO.Path.GetFileNameWithoutExtension(huiPath);
+
+        // Load database
+        var db = HuiProReader.Read(huiPath, proPath);
+
+        // Compute mu = threshold * total TWU
+        long totalTwu = db.Transactions.Sum(tx => tx.TU);
+        long mu = (long)(threshold * totalTwu);
+
+        // Force GC before measuring baseline memory
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var process = Process.GetCurrentProcess();
+        process.Refresh();
+        long memoryBeforeBytes = process.WorkingSet64;
+        long managedMemBefore = GC.GetTotalMemory(false);
+
+        // Run the algorithm
+        var result = algo.Run(db, mu, AlgorithmMode.MaxCHUI);
+
+        // Measure memory after execution
+        // On macOS, PeakWorkingSet64 is not supported (returns 0),
+        // so we use WorkingSet64 (current RSS) and GC managed heap.
+        process.Refresh();
+        long memoryAfterBytes = process.WorkingSet64;
+        long managedMemAfter = GC.GetTotalMemory(false);
+
+        long processMemoryUsedKb = Math.Max(0, (memoryAfterBytes - memoryBeforeBytes)) / 1024;
+        long managedMemUsedKb = Math.Max(0, (managedMemAfter - managedMemBefore)) / 1024;
+        long totalRssKb = memoryAfterBytes / 1024;
+
+        // Output structured result line for Python to parse
+        Console.WriteLine(
+            $"BENCHMARK_RESULT" +
+            $"|algorithm={algorithmName}" +
+            $"|dataset={datasetName}" +
+            $"|threshold={threshold}" +
+            $"|mu={mu}" +
+            $"|total_twu={totalTwu}" +
+            $"|runtime_ms={result.Runtime.TotalMilliseconds:F2}" +
+            $"|memory_kb={processMemoryUsedKb}" +
+            $"|managed_memory_kb={managedMemUsedKb}" +
+            $"|total_rss_kb={totalRssKb}" +
+            $"|closed_hui_count={result.CHUIs.Count}" +
+            $"|max_hui_count={result.MaxHUIs.Count}" +
+            $"|candidates_count={result.CandidatesCount}" +
+            $"|max_hui_checks={result.MaxHuiChecksCount}"
+        );
+    }
+
+    static string GetArg(string[] args, string name)
+    {
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == name)
+                return args[i + 1];
+        }
+        throw new ArgumentException($"Missing required argument: {name}");
+    }
+
+    /// <summary>
+    /// Returns the peak working set (RSS) of the current process in bytes.
+    /// </summary>
+    static long GetProcessMemoryBytes()
+    {
+        var process = Process.GetCurrentProcess();
+        process.Refresh();
+        return process.PeakWorkingSet64;
     }
 
     static void VerifyAndSortResults(QuantitativeDatabase db, AlgorithmResult res)
@@ -183,20 +238,20 @@ class Program
         // Mine both CHUIs and MaxHUIs
         var result = algo.Run(db, mu, AlgorithmMode.MaxCHUI);
 
-        Console.WriteLine("\n--- Mined Closed High Utility Itemsets (CHUIs) ---");
-        foreach (var chui in result.CHUIs)
-        {
-            Console.WriteLine($"Itemset: {chui.Itemset}, Utility: {chui.Utility}, Support: {chui.Support}");
-        }
-
-        Console.WriteLine("\n--- Mined Maximal High Utility Itemsets (MaxHUIs) ---");
-        if (db.Transactions.Count <= 20)
-        {
-            foreach (var maxHui in result.MaxHUIs)
-            {
-                Console.WriteLine($"Itemset: {maxHui.Itemset}, Utility: {maxHui.Utility}");
-            }
-        }
+        // Console.WriteLine("\n--- Mined Closed High Utility Itemsets (CHUIs) ---");
+        // foreach (var chui in result.CHUIs)
+        // {
+        //     Console.WriteLine($"Itemset: {chui.Itemset}, Utility: {chui.Utility}, Support: {chui.Support}");
+        // }
+        //
+        // Console.WriteLine("\n--- Mined Maximal High Utility Itemsets (MaxHUIs) ---");
+        // if (db.Transactions.Count <= 20)
+        // {
+        //     foreach (var maxHui in result.MaxHUIs)
+        //     {
+        //         Console.WriteLine($"Itemset: {maxHui.Itemset}, Utility: {maxHui.Utility}");
+        //     }
+        // }
 
         Console.WriteLine($"\nRuntime: {result.Runtime.TotalMilliseconds} ms");
         Console.WriteLine($"ClosedHUIs Found: {result.CHUIs.Count} - MaxHUIs Found: {result.MaxHUIs.Count}");

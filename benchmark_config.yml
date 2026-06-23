@@ -1,0 +1,24 @@
+# ─── Benchmark Configuration for MaxCHUIM ───
+
+# Path to the folder containing .hui files
+hui_folder: "/Users/mac/BINH/NCKH/Dataset/HUI"
+
+# Path to the folder containing .pro files
+pro_folder: "/Users/mac/BINH/NCKH/Dataset/PRO"
+
+# Number of times each (algorithm × dataset × threshold) is repeated
+run_attempts: 3
+
+# Algorithms to benchmark
+algorithms:
+  - MaxCHuim
+  - MaxCHuimBitmax
+
+# Datasets: each has a name and a list of thresholds
+datasets:
+  - name: chess
+    thresholds: [0.3, 0.35, 0.4, 0.45, 0.5]
+  - name: mushroom
+    thresholds: [0.3, 0.35, 0.4, 0.45, 0.5]
+  - name: connect
+    thresholds: [0.3, 0.35, 0.4, 0.45, 0.5]

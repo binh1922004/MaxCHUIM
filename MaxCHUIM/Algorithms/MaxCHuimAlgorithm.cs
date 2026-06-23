@@ -213,10 +213,6 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
     }
     private void Update(Itemset A, long utility, long twu, int support)
     {
-        if (A.IsSupersetOf(new Itemset([2, 4, 6])))
-        {
-            Console.WriteLine($"Found CHUI: {A} with utility {utility}, support {support}, twu {twu}");
-        }
         if (utility >= _mu)
         {
             _chuiStore.Add(A, support, utility, twu);
