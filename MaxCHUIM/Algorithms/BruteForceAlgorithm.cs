@@ -92,9 +92,33 @@ public class BruteForceAlgorithm : BaseAlgorithm
                     }
                 }
 
-                if (mls.Count > 0)
+                int extCount = mls.Count;
+                for (int x = 0; x < extCount; x++)
                 {
-                    FindAllHUIs(mls, new List<int> { aj });
+                    var mlC = mls[x];
+                    for (int y = x + 1; y < extCount; y++)
+                    {
+                        var mlB = mls[y];
+                        var mlS = MpunList.JoinLists(mlC, mlB);
+                        if (mlS.Support() == mlB.Support())
+                        {
+                            mlB.PruningNonMCBr = true;
+                        }
+                    }
+                }
+
+                var survivingLists = new List<MpunList>();
+                for (int x = 0; x < extCount; x++)
+                {
+                    if (!mls[x].PruningNonMCBr)
+                    {
+                        survivingLists.Add(mls[x]);
+                    }
+                }
+
+                if (survivingLists.Count > 0)
+                {
+                    FindAllHUIs(survivingLists, new List<int> { aj });
                 }
             }
         }
@@ -170,16 +194,40 @@ public class BruteForceAlgorithm : BaseAlgorithm
                 {
                     var mlY = mpunLists[j];
                     var mlXY = MpunList.JoinLists(mlX, mlY);
-                    
                     if (mlXY.Support() > 0)
                     {
                         nextLists.Add(mlXY);
                     }
                 }
 
-                if (nextLists.Count > 0)
+                // Apply PruningNonMCBr for siblings
+                int extCount = nextLists.Count;
+                for (int x = 0; x < extCount; x++)
                 {
-                    FindAllHUIs(nextLists, newPrefix);
+                    var mlC = nextLists[x];
+                    for (int y = x + 1; y < extCount; y++)
+                    {
+                        var mlB = nextLists[y];
+                        var mlS = MpunList.JoinLists(mlC, mlB);
+                        if (mlS.Support() == mlB.Support())
+                        {
+                            mlB.PruningNonMCBr = true;
+                        }
+                    }
+                }
+
+                var survivingLists = new List<MpunList>();
+                for (int x = 0; x < extCount; x++)
+                {
+                    if (!nextLists[x].PruningNonMCBr)
+                    {
+                        survivingLists.Add(nextLists[x]);
+                    }
+                }
+
+                if (survivingLists.Count > 0)
+                {
+                    FindAllHUIs(survivingLists, newPrefix);
                 }
             }
         }

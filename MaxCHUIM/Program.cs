@@ -42,26 +42,36 @@ class Program
         }
 
         var tput = new Tput();
-        tput.Build(rd);
-        
-        Console.WriteLine("========================================");
-        var res1 = RunAlgorithm("MaxCHuim", db, mu, AlgorithmMode.MaxCHUI);
-        
-        Console.WriteLine("========================================");
-        var res2 = RunAlgorithm("BmMaxHui", db, mu, AlgorithmMode.MaxCHUI);
-        
-        Console.WriteLine("========================================");
-        var res3 = RunAlgorithm("BruteForce", db, mu, AlgorithmMode.MaxCHUI);
-        
-        VerifyAndSortResults(db, res1);
-        VerifyAndSortResults(db, res2);
-        VerifyAndSortResults(db, res3);
+        var bruteForceAlg = new BruteForceAlgorithm();
+        var maxCHuimBitmaxAlg = new MaxCHuimBitmaxAlgorithm();
+        var maxCHuimAlg = new MaxCHuimAlgorithm();
+        var bmMaxHuiAlg = new BmMaxHuiAlgorithm();
 
-        Console.WriteLine("\n[1] Compare BmMaxHui against Ground Truth (BruteForce):");
-        CompareMaxHUIs(res3.MaxHUIs, res2.MaxHUIs); // list1=BruteForce, list2=BmMaxHui
+        Console.WriteLine("========================================");
+        var res1 = RunAlgorithm("MaxCHuim", maxCHuimAlg, db, mu, AlgorithmMode.MaxCHUI);
         
-        Console.WriteLine("\n[2] Compare MaxCHuim against Ground Truth (BruteForce):");
-        CompareMaxHUIs(res3.MaxHUIs, res1.MaxHUIs); // list1=BruteForce, list2=MaxCHuim
+        // Console.WriteLine("========================================");
+        // var res2 = RunAlgorithm("BmMaxHui", bmMaxHuiAlg, db, mu, AlgorithmMode.MaxCHUI);
+        //
+        Console.WriteLine("========================================");
+        var resBitmaxOrig = RunAlgorithm("MaxCHuimBitmax", maxCHuimBitmaxAlg, db, mu, AlgorithmMode.MaxCHUI);
+        //
+        // Console.WriteLine("========================================");
+        // var resBruteForce = RunAlgorithm("BruteForce", bruteForceAlg, db, mu, AlgorithmMode.MaxCHUI);
+        //
+        // VerifyAndSortResults(db, res1);
+        // VerifyAndSortResults(db, res2);
+        // VerifyAndSortResults(db, resBitmaxOrig);
+        // VerifyAndSortResults(db, resBruteForce);
+        //
+        // Console.WriteLine("\n[1] Compare BmMaxHui against MaxCHuim:");
+        // CompareMaxHUIs(res1.MaxHUIs, res2.MaxHUIs);
+        //
+        // Console.WriteLine("\n[2] Compare MaxCHuimBitmax against MaxCHuim:");
+        // CompareMaxHUIs(res1.MaxHUIs, resBitmaxOrig.MaxHUIs);
+        //
+        // Console.WriteLine("\n[3] Compare MaxCHuimBitmax against BmMaxHui:");
+        // CompareMaxHUIs(res2.MaxHUIs, resBitmaxOrig.MaxHUIs);
     }
 
     static void VerifyAndSortResults(QuantitativeDatabase db, AlgorithmResult res)
@@ -166,38 +176,27 @@ class Program
         Console.WriteLine($"Number of MaxCHuim MaxHUIs entirely missing and NOT subsets: {missingAndNotSubset}");
     }
 
-    static AlgorithmResult RunAlgorithm(string algorithm, QuantitativeDatabase db, long mu, AlgorithmMode mode)
+    static AlgorithmResult RunAlgorithm(string algorithm, BaseAlgorithm algo, QuantitativeDatabase db, long mu, AlgorithmMode mode)
     {
-        BaseAlgorithm algo = null;
-        if (algorithm == "MaxCHuim")
-        {
-            algo = new MaxCHuimAlgorithm();
-        }
-        else if (algorithm == "BmMaxHui")
-        {
-            algo = new BmMaxHuiAlgorithm();
-        }
-        else if (algorithm == "BruteForce")
-        {
-            algo = new BruteForceAlgorithm();
-        }
-        
         Console.WriteLine($"Algorithm: {algorithm}, Mode: {mode}, mu: {mu}");
 
         // Mine both CHUIs and MaxHUIs
         var result = algo.Run(db, mu, AlgorithmMode.MaxCHUI);
 
         Console.WriteLine("\n--- Mined Closed High Utility Itemsets (CHUIs) ---");
-        // foreach (var chui in result.CHUIs)
-        // {
-        //     Console.WriteLine($"Itemset: {chui.Itemset}, Utility: {chui.Utility}, Support: {chui.Support}");
-        // }
+        foreach (var chui in result.CHUIs)
+        {
+            Console.WriteLine($"Itemset: {chui.Itemset}, Utility: {chui.Utility}, Support: {chui.Support}");
+        }
 
         Console.WriteLine("\n--- Mined Maximal High Utility Itemsets (MaxHUIs) ---");
-        // foreach (var maxHui in result.MaxHUIs)
-        // {
-        //     Console.WriteLine($"Itemset: {maxHui.Itemset}, Utility: {maxHui.Utility}");
-        // }
+        if (db.Transactions.Count <= 20)
+        {
+            foreach (var maxHui in result.MaxHUIs)
+            {
+                Console.WriteLine($"Itemset: {maxHui.Itemset}, Utility: {maxHui.Utility}");
+            }
+        }
 
         Console.WriteLine($"\nRuntime: {result.Runtime.TotalMilliseconds} ms");
         Console.WriteLine($"ClosedHUIs Found: {result.CHUIs.Count} - MaxHUIs Found: {result.MaxHUIs.Count}");

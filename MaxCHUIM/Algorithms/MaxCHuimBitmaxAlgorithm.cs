@@ -8,13 +8,9 @@ using MaxCHUIM.Utilities;
 
 namespace MaxCHUIM.Algorithms;
 
-public enum AlgorithmMode
-{
-    CHUI,
-    MaxCHUI
-}
 
-public class MaxCHuimAlgorithm : BaseAlgorithm
+
+public class MaxCHuimBitmaxAlgorithm : BaseAlgorithm
 {
     private long _mu;
     private AlgorithmMode _mode;
@@ -25,7 +21,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
     private long _maxHuiChecksCount;
 
     private readonly ChuiStore _chuiStore = new();
-    private readonly MaxHuiStore _maxHuiStore = new();
+    private BmMaxHuiStore _maxHuiStore = null!;
 
     public AlgorithmResult Run(QuantitativeDatabase db, long mu, AlgorithmMode mode)
     {
@@ -35,7 +31,6 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         _candidatesCount = 0;
         _maxHuiChecksCount = 0;
         _chuiStore.Clear();
-        _maxHuiStore.Clear();
 
         // 2. Preprocess database
         var rd = DatasetPreprocessor.Preprocess(db, mu);
@@ -71,6 +66,8 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
             var twuB = rd.TwuMap[b];
             return twuA != twuB ? twuA.CompareTo(twuB) : a.CompareTo(b); // Stable tie-break
         });
+
+        _maxHuiStore = new BmMaxHuiStore(frequentItems, 0.5);
 
         // 4. Outer loop over items aj (ordered by ≺twu)
         var itemCount = frequentItems.Count;
@@ -136,7 +133,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
         {
             var mlJ = mls[j];
             int itemJ = mlJ.Item;
-            
+
             // 1. A = prefix ⊕ MLj.item
             var AList = new List<int>(prefix.Count + 1);
             AList.AddRange(prefix);
@@ -213,17 +210,14 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
     }
     private void Update(Itemset A, long utility, long twu, int support)
     {
-        if (A.IsSupersetOf(new Itemset([2, 4, 6])))
-        {
-            Console.WriteLine($"Found CHUI: {A} with utility {utility}, support {support}, twu {twu}");
-        }
+        
         if (utility >= _mu)
         {
             _chuiStore.Add(A, support, utility, twu);
             if (_mode == AlgorithmMode.MaxCHUI)
             {
                 _maxHuiChecksCount++;
-                _maxHuiStore.UpdateMHUI(A, utility, twu);
+                _maxHuiStore.UpdateMHUI(A, utility);
             }
         }
     }
