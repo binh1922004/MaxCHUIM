@@ -1,0 +1,31 @@
+Finished reading .hui and .pro files. Total transactions: 8124
+========================================
+Algorithm: MaxCHuim, Mode: MaxCHUI, mu: 7311
+
+--- Mined Closed High Utility Itemsets (CHUIs) ---
+
+--- Mined Maximal High Utility Itemsets (MaxHUIs) ---
+
+Runtime: 27792.6638 ms
+ClosedHUIs Found: 121735 - MaxHUIs Found: 7919
+Candidate Itemsets Evaluated: 131381
+MaxHui Checks Performed: 121735
+Validating MaxHUIs...
+[PASS] All MaxHUIs are truly maximal.
+Fake HUIs (Utility < mu): 0
+========================================
+Algorithm: BmMaxHui, Mode: MaxCHUI, mu: 7311
+
+--- Mined Closed High Utility Itemsets (CHUIs) ---
+
+--- Mined Maximal High Utility Itemsets (MaxHUIs) ---
+
+Runtime: 9518.4465 ms
+ClosedHUIs Found: 75418 - MaxHUIs Found: 10508
+Candidate Itemsets Evaluated: 190861
+MaxHui Checks Performed: 173197
+Validating MaxHUIs...
+[PASS] All MaxHUIs are truly maximal.
+Fake HUIs (Utility < mu): 0
+========================================
+Algorithm: BruteForce, Mode: MaxCHUI, mu: 7311
