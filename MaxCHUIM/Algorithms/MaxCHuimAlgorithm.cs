@@ -131,11 +131,11 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
 
     private void FindMaxCHUI(List<MpunList> mls, List<int> prefix)
     {
-        int mlsCount = mls.Count;
-        for (int j = 0; j < mlsCount; j++)
+        var mlsCount = mls.Count;
+        for (var j = 0; j < mlsCount; j++)
         {
             var mlJ = mls[j];
-            int itemJ = mlJ.Item;
+            var itemJ = mlJ.Item;
             
             // 1. A = prefix ⊕ MLj.item
             var AList = new List<int>(prefix.Count + 1);
@@ -144,7 +144,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
             var A = new Itemset(AList);
 
             // Compute TWU of A
-            long twuA = mlJ.ComputeTwu(_tput, _txById);
+            var twuA = mlJ.ComputeTwu(_tput, _txById);
 
             // 2. If fwub(A) < mu -> Update(A) then return
             if (mlJ.Fwub() < _mu)
@@ -189,7 +189,7 @@ public class MaxCHuimAlgorithm : BaseAlgorithm
             var cnt = extensionLists.Count(ml => ml.Support() == mlJ.Support());
             // 7. UpdateMaxCHUI
             Update(A, mlJ.Utility(), twuA, mlJ.Support());
-            if (cnt < mls.Count)
+            if (cnt < extensionLists.Count)
             {
                 FindMaxCHUI(extensionLists, AList);
             }
