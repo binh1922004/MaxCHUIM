@@ -186,7 +186,7 @@ public class MaxCHuimBitmaxAlgorithm : BaseAlgorithm
             var cnt = extensionLists.Count(ml => ml.Support() == mlJ.Support());
             // 7. UpdateMaxCHUI
             Update(A, mlJ.Utility(), twuA, mlJ.Support());
-            if (cnt < mls.Count)
+            if (cnt < extensionLists.Count)
             {
                 FindMaxCHUI(extensionLists, AList);
             }
