@@ -57,3 +57,6 @@ TestResult.xml
 nunit-*.xml
 .idea/
 build_output/
+avg/
+charts/
+reports/

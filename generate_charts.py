@@ -62,63 +62,73 @@ def generate_line_charts(
     df["memory_mb"] = df[memory_column] / 1024
 
     for dataset_name, dataset_df in df.groupby("dataset", sort=True):
-        fig, axes = plt.subplots(
-            nrows=2,
-            ncols=1,
-            figsize=(12, 10),
+        safe_dataset_name = "".join(
+            char if char.isalnum() or char in "-_" else "_"
+            for char in str(dataset_name)
         )
+
+        # ---------------------------------------------------------
+        # 1. Generate and save the Runtime chart
+        # ---------------------------------------------------------
+        fig_runtime, ax_runtime = plt.subplots(figsize=(10, 6))
 
         for algorithm_name, algorithm_df in dataset_df.groupby("algorithm"):
             algorithm_df = algorithm_df.sort_values("threshold")
-
-            # Runtime line.
-            axes[0].plot(
+            ax_runtime.plot(
                 algorithm_df["threshold"],
                 algorithm_df["runtime_seconds"],
                 marker="o",
                 label=algorithm_name,
             )
 
-            # Memory line.
-            axes[1].plot(
+        ax_runtime.set_title(f"Runtime comparison — {dataset_name}")
+        ax_runtime.set_xlabel("Threshold")
+        ax_runtime.set_ylabel("Runtime (seconds)")
+        ax_runtime.grid(True, linestyle="--", alpha=0.5)
+        ax_runtime.legend(title="Algorithm")
+
+        fig_runtime.tight_layout()
+        runtime_output_path = chart_directory / f"{safe_dataset_name}_runtime_chart.png"
+        
+        fig_runtime.savefig(
+            runtime_output_path,
+            dpi=200,
+            bbox_inches="tight",
+        )
+        plt.close(fig_runtime)
+        print(f"Created: {runtime_output_path}")
+
+
+        # ---------------------------------------------------------
+        # 2. Generate and save the Memory chart
+        # ---------------------------------------------------------
+        fig_memory, ax_memory = plt.subplots(figsize=(10, 6))
+
+        for algorithm_name, algorithm_df in dataset_df.groupby("algorithm"):
+            algorithm_df = algorithm_df.sort_values("threshold")
+            ax_memory.plot(
                 algorithm_df["threshold"],
                 algorithm_df["memory_mb"],
                 marker="o",
                 label=algorithm_name,
             )
 
-        axes[0].set_title(f"Runtime comparison — {dataset_name}")
-        axes[0].set_xlabel("Threshold")
-        axes[0].set_ylabel("Runtime (seconds)")
-        axes[0].grid(True, linestyle="--", alpha=0.5)
-        axes[0].legend(title="Algorithm")
+        ax_memory.set_title(f"Memory comparison — {dataset_name}")
+        ax_memory.set_xlabel("Threshold")
+        ax_memory.set_ylabel("Memory (MB)")
+        ax_memory.grid(True, linestyle="--", alpha=0.5)
+        ax_memory.legend(title="Algorithm")
 
-        axes[1].set_title(f"Memory comparison — {dataset_name}")
-        axes[1].set_xlabel("Threshold")
-        axes[1].set_ylabel("Memory (MB)")
-        axes[1].grid(True, linestyle="--", alpha=0.5)
-        axes[1].legend(title="Algorithm")
-
-        fig.tight_layout()
-
-        safe_dataset_name = "".join(
-            char if char.isalnum() or char in "-_" else "_"
-            for char in str(dataset_name)
-        )
-
-        output_path = (
-            chart_directory / f"{safe_dataset_name}_line_chart.png"
-        )
-
-        fig.savefig(
-            output_path,
+        fig_memory.tight_layout()
+        memory_output_path = chart_directory / f"{safe_dataset_name}_memory_chart.png"
+        
+        fig_memory.savefig(
+            memory_output_path,
             dpi=200,
             bbox_inches="tight",
         )
-
-        plt.close(fig)
-
-        print(f"Created: {output_path}")
+        plt.close(fig_memory)
+        print(f"Created: {memory_output_path}")
 
 
 def main() -> None:
